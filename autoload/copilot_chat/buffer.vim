@@ -224,7 +224,7 @@ export def SwitchMode(): void
 enddef
 
 export def ChangeMode(mode: string): void
-  g:copilot_chat_mode == mode
+  g:copilot_chat_mode = mode
 
   if g:copilot_chat_active_buffer == -1 || !bufexists(g:copilot_chat_active_buffer)
     return
