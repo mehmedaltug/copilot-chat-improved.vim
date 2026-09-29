@@ -4,67 +4,53 @@ scriptencoding utf-8
 import autoload 'copilot_chat/auth.vim' as auth
 import autoload 'copilot_chat/buffer.vim' as _buffer
 import autoload 'copilot_chat/models.vim' as models
-
-def UserStatsClose(winid: number, key: string): number
-  if key ==? "\<Esc>" || key ==? 'q'
-    popup_close(winid)
-    return 1
-  endif
-
-  return 1
-enddef
-
-export def GetUsage()
-  var device_token_file: string = $'{g:copilot_chat_data_dir}/.device_token'
-  var bearer_token = join(readfile(device_token_file), "\n")
-  var token_headers = [
-    'Accept: application/json',
-    'Accept-Encoding: gzip,deflate,br',
-    'Content-Type: application/json',
-    $'Authorization: token {bearer_token}'
-  ]
-
-  var command = HttpCommand('GET', 'https://api.github.com/copilot_internal/user', token_headers, {})
-  var output = []
-  job_start(command, {
-    'out_cb': (channel, msg) => output->add(msg),
-    'exit_cb': (job, status) => HandleUserUsageExit(output, status)
-  })
-enddef
-
-def HandleUserUsageExit(output: list<string>, status: number)
-  if status == 0
-    var raw_response = join(output, '')
-    var response = json_decode(raw_response)
-    var display_items = []
-    display_items->add('Copilot Plan: ' .. response['copilot_plan'])
-    display_items->add('Chat messages: ' .. response['quota_snapshots']['chat']['unlimited'])
-
-    var premium_interactions = response['quota_snapshots']['premium_interactions']
-    var total_count = premium_interactions['entitlement']
-    var used_count = total_count - premium_interactions['remaining']
-    display_items->add('Premium Requests Used: ' .. used_count .. ' / ' .. total_count)
-    display_items->add('Quota resets at: ' .. response['quota_reset_date'])
-
-    var options = {
-      'border': [1, 1, 1, 1],
-      'borderchars': ['─', '│', '─', '│', '┌', '┐', '┘', '└'],
-      'borderhighlight': ['DiffAdd'],
-      'highlight': 'PopupNormal',
-      'padding': [1, 1, 1, 1],
-      'pos': 'center',
-      'minwidth': 50,
-      'title': 'Copilot User Info',
-      'filter': UserStatsClose,
-      'close': 'button'
-    }
-    popup_create(display_items, options)
-  endif
-enddef
+import autoload 'copilot_chat/tools.vim' as tools
+import autoload 'copilot_chat/debug.vim' as debugger
 
 var curl_output: list<string> = []
+var buffer_messages = []
+var function_calls = []
+
+export def AgentRequest(messages: list<any>): void
+  var chat_token: string = auth.VerifySignin()
+  buffer_messages = messages
+  var url: string = 'https://api.individual.githubcopilot.com/responses'
+  var data: string = json_encode({
+    'model': models.Current(),
+    'stream': true,
+    'tools': tools.List(),
+    'input': messages
+  })
+  debugger.Write('making agent request')
+  debugger.Write(data)
+
+  var tmpfile: string = tempname()
+  writefile([data], tmpfile)
+
+  var curl_cmd: list<string> = [
+    'curl',
+    '-s',
+    '-X',
+    'POST',
+    '-H',
+    'Content-Type: application/json',
+    '-H', 'Authorization: Bearer ' .. chat_token,
+    '-H', 'Editor-Version: vscode/1.80.1',
+    '-d',
+    $'@{tmpfile}',
+    url
+  ]
+
+  var job: job = job_start(curl_cmd, {
+     'out_cb': function('HandleAgentJobOutput'),
+     'exit_cb': function('HandleAgentJobClose'),
+     'err_cb': function('HandleAgentJobError')
+     })
+  _buffer.WaitingForResponse()
+enddef
 
 export def AsyncRequest(messages: list<any>, file_list: list<any>): job
+  var chat_token: string = auth.VerifySignin()
   curl_output = []
   var url: string = 'https://api.githubcopilot.com/chat/completions'
 
@@ -99,9 +85,8 @@ export def AsyncRequest(messages: list<any>, file_list: list<any>): job
     'POST',
     '-H',
     'Content-Type: application/json',
-    '-H', 'Authorization: Bearer ' .. g:copilot_chat_token,
-    '-H', 'Editor-Version: vscode/1.107.0',
-    '-H', 'Editor-Plugin-Version: copilot-chat/0.36.2025121601',
+    '-H', 'Authorization: Bearer ' .. chat_token,
+    '-H', 'Editor-Version: vscode/1.80.1',
     '-d',
     $'@{tmpfile}',
     url
@@ -118,6 +103,40 @@ export def AsyncRequest(messages: list<any>, file_list: list<any>): job
   return job
 enddef
 
+def HandleAgentJobOutput(channel: any, msg: any): void
+  if type(msg) == v:t_list
+    for data in msg
+      if data =~? '^data: {'
+        add(curl_output, data)
+      endif
+    endfor
+  else
+    add(curl_output, msg)
+  endif
+enddef
+
+def HandleAgentJobClose(channel: any, msg: any)
+  deletebufline(g:copilot_chat_active_buffer, '$')
+  for line in curl_output
+    if line =~? '^data: {'
+      var json_completion = json_decode(strcharpart(line, 6))
+      if index(keys(json_completion), 'response') != -1 && json_completion['response']['output'] != v:null
+        if len(json_completion['response']['output']) > 0
+          var outcome = json_completion['response']['output'][-1]
+          if outcome['type'] == 'function_call' && index(function_calls, outcome['call_id']) == -1
+            tools.InvokeTool(outcome, buffer_messages)
+            add(function_calls, outcome['call_id'])
+          elseif outcome['type'] == 'message'
+            for m in outcome['content']
+              _buffer.AppendResponse(m['text'])
+            endfor
+          endif
+        endif
+      endif
+    endif
+  endfor
+enddef
+
 def HandleJobOutput(channel: any, msg: any): void
   if type(msg) == v:t_list
     for data in msg
@@ -128,6 +147,10 @@ def HandleJobOutput(channel: any, msg: any): void
   else
     add(curl_output, msg)
   endif
+enddef
+
+def HandleAgentJobError(channel: any, msg: list<any>)
+  echom msg
 enddef
 
 def HandleJobClose(channel: any, msg: any)
@@ -155,9 +178,7 @@ def HandleJobClose(channel: any, msg: any)
   separator ..= repeat('━', width)
   var response_start = line('$') + 1
 
-  _buffer.AppendMessage(separator)
-  _buffer.AppendMessage(response)
-  _buffer.AddInputSeparator()
+  _buffer.AppendResponse(response)
 
   var wrap_width = width + 2
   var softwrap_lines = 0
@@ -190,85 +211,64 @@ def HandleJobError(channel: any, msg: list<any>)
   endif
 enddef
 
-export def FetchModels()
+export def FetchModels(chat_token: string): list<string>
   if exists('g:copilot_chat_test_mode')
-    return
+    return ['gpt-o4']
   endif
 
   var chat_headers = [
-    $'Authorization: Bearer {g:copilot_chat_token}',
-    'Editor-Version: vscode/1.107.0',
-    'Editor-Plugin-Version: copilot-chat/0.36.2025121601',
-    'x-github-api-version: 2025-10-01'
+    'Content-Type: application/json',
+    $'Authorization: Bearer {chat_token}',
+    'Editor-Version: vscode/1.80.1'
   ]
 
-  var command = HttpCommand('GET', 'https://api.githubcopilot.com/models', chat_headers, {})
-  var output = []
-  job_start(command, {
-    'out_cb': (channel, msg) => output->add(msg),
-    'exit_cb': (job, status) => HandleFetchModelsExit(output, status)
-  })
+  var response = Http('GET', 'https://api.githubcopilot.com/models', chat_headers, {})
+  var model_list = []
+  var json_response = json_decode(response)
+  for item in json_response.data
+    if has_key(item, 'id')
+      add(model_list, item.id)
+    endif
+  endfor
+  return model_list
 enddef
 
-def HandleFetchModelsExit(output: list<string>, status: number)
-  if status == 0
-    try
-      var response = join(output, '')
-      var model_list = []
-      var model_multipliers = {}
-      var json_response = json_decode(response)
-      for item in json_response.data
-        if has_key(item, 'id')
-          model_list->add(item.id)
-          model_multipliers[item.id] = item.billing.multiplier
-        endif
-      endfor
-      g:copilot_chat_available_models = model_list
-      g:copilot_chat_model_multipliers = model_multipliers
-    catch
-      # fetch models response failed
-    endtry
-  else
-    auth.GetTokens()
-  endif
-enddef
-
-export def HttpCommand(method: string, url: string, headers: list<any>, body: any): any
+export def Http(method: string, url: string, headers: list<any>, body: any): string
+  var response = ''
   if has('win32')
-    var command = ''
-    command ..= 'powershell -Command "'
-    command ..= '$headers = @{'
+    var ps_cmd = 'powershell -Command "'
+    ps_cmd ..= '$headers = @{'
     for header in headers
       var parts = split(header, ': ')
       var key = parts[0]
       var value = parts[1]
-      command ..= "'" .. key .. "'='" .. value .. "';"
+      ps_cmd ..= "'" .. key .. "'='" .. value .. "';"
     endfor
-    command ..= '};'
+    ps_cmd ..= '};'
     if method !=# 'GET'
-      command ..= '$body = ConvertTo-Json @{'
+      ps_cmd ..= '$body = ConvertTo-Json @{'
       for obj in keys(body)
-        command ..= obj .. "='" .. body[obj] .. "';"
+        ps_cmd ..= obj .. "='" .. body[obj] .. "';"
       endfor
-      command ..= '};'
+      ps_cmd ..= '};'
     endif
-    command ..= "Invoke-WebRequest -Uri '" .. url .. "' -Method " .. method .. " -Headers $headers -Body $body -ContentType 'application/json' -UseBasicParsing | Select-Object -ExpandProperty Content"
-    command ..= '"'
-    return command
+    ps_cmd ..= "Invoke-WebRequest -Uri '" .. url .. "' -Method " .. method .. " -Headers $headers -Body $body -ContentType 'application/json' | Select-Object -ExpandProperty Content"
+    ps_cmd ..= '"'
+    response = system(ps_cmd)
   else
-    var command = ['curl', '-s', '-X', method, '--compressed']
+    var token_data = json_encode(body)
+
+    var curl_cmd = 'curl -s -X ' .. method .. ' --compressed '
     for header in headers
-      command->add('-H')
-      command->add(header)
+      curl_cmd ..= '-H "' .. header .. '" '
     endfor
+    curl_cmd ..= "-d '" .. token_data .. "' " .. url
 
-    if method !=# 'GET'
-      var token_data = json_encode(body)
-      command->add('-d')
-      command->add(token_data)
+    response = system(curl_cmd)
+    if v:shell_error != 0
+      echom 'Error: ' .. v:shell_error
+      return ''
     endif
-    command->add(url)
-
-    return command
   endif
+  return response
 enddef
