@@ -417,6 +417,28 @@ export def CheckForMacro(): void
 
     # Position cursor on the empty line
     cursor(line('.'), 1)
+  elseif current_line =~# '/buff all'
+    var pattern_start: number = match(before_cursor, '/buff all')
+
+    cursor(line('.'), pattern_start + 1)
+    exec 'normal! d' .. len('/buff all') .. 'l'
+
+    var buff_list: list<string> = []
+    for buf in getbufinfo({'buflisted': 1})
+      var filename: string = buf.name
+      if filename !=# '' && filename !~# 'CopilotChat'
+        add(buff_list, $'#file: {filename}')
+      endif
+    endfor
+
+    if len(buff_list) > 0
+      var buff_text: string = join(buff_list, "\n") .. "\n"
+      exec 'normal! i' .. buff_text
+    else
+      exec "normal! iNo buffers found\n"
+    endif
+
+    cursor(line('.'), 1)
   elseif current_line =~# '#file: '
     if completion_active == 1 && !pumvisible()
       completion_active = 0
