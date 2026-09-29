@@ -6,18 +6,27 @@ import autoload 'copilot_chat/buffer.vim' as _buffer
 import autoload 'copilot_chat/api.vim' as api
 
 export def OpenChat(): void
-  if _buffer.HasActiveChat() && g:copilot_reuse_active_chat == 1
-    _buffer.FocusActiveChat()
-  else
-    _buffer.Create()
+  if auth.VerifySignin() != v:null
+    if _buffer.HasActiveChat() && g:copilot_reuse_active_chat == 1
+      _buffer.FocusActiveChat()
+    else
+      _buffer.Create()
+    endif
   endif
-  timer_start(10, (_) => auth.VerifySignin())
 enddef
 
 export def StartChat(message: string): void
   OpenChat()
   _buffer.AppendMessage(message)
-  api.AsyncRequest([{'content': message, 'role': 'user'}], [])
+  #api.AsyncRequest([{'content': message, 'role': 'user'}], [])
+  var user_obj = {
+    "role": "user",
+    'content': [{
+      'type': 'input_text',
+      'text': '<userRequest>\nUpdate the CONTRIBUTING.md file to include more emojis throughout the file. do not delete the existing file\n</userRequest>'
+    }]
+  }
+  api.AgentRequest([user_obj])
 enddef
 
 export def ResetChat(): void
@@ -43,7 +52,6 @@ export def ResetChat(): void
 enddef
 
 export def SubmitMessage(): void
-  auth.GetTokens()
   var messages = []
   var pattern = ' ━\+$'
   var all_file_lists = []
@@ -77,8 +85,8 @@ export def SubmitMessage(): void
         if has_key(g:copilot_chat_prompts, text)
           lines[i] = g:copilot_chat_prompts[text]
         endif
-      elseif line =~? '^#file:'
-        var filename: string = matchstr(line, '^#file:\s*\zs.*\ze$')
+      elseif line =~? '^#file: '
+        var filename: string = matchstr(line, '^#file: \s*\zs.*\ze$')
         add(file_list, filename)
       endif
     endfor
@@ -111,5 +119,6 @@ export def SubmitMessage(): void
     endfor
   endfor
 
+  # TODO: use g:copilot_chat_mode to use ask/agent request
   api.AsyncRequest(messages, consolidated_files)
 enddef
