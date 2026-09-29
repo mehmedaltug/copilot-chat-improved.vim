@@ -12,6 +12,7 @@ Nvim users can check [CopilotChat.nvim](https://github.com/CopilotC-Nvim/Copilot
 ## Requirements
 
 - [Vim > 9.0](https://github.com/vim/vim)
+- Curl (Mandatory for both Unix and Windows)
 - [NerdFonts](https://www.nerdfonts.com) (Optional for pretty icons)
 
 ## Installation

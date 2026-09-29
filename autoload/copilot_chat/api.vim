@@ -16,59 +16,24 @@ export def Http(method: string, url: string, headers: list<string>, body: any): 
   var response = ''
   var json_body = (method !=# 'GET' && !empty(body)) ? json_encode(body) : ''
 
-  if has('win32')
-    var ps_cmd = 'powershell -WindowStyle Hidden -NoProfile -Command "'
-    ps_cmd ..= '$headers = @{'
-    for header in headers
-      var idx = stridx(header, ':')
-      if idx != -1
-        var key = trim(header[0 : idx - 1])
-        var val = trim(header[idx + 1 :])
-        key = substitute(key, "'", "''", 'g')
-        val = substitute(val, "'", "''", 'g')
-        ps_cmd ..= "'" .. key .. "'='" .. val .. "';"
-      endif
-    endfor
-    ps_cmd ..= '};'
+  var esc_url = substitute(url, "'", "'\\''", 'g')
+  var curl_cmd = 'curl -s -N -X ' .. method .. ' --compressed '
 
-    var esc_url = substitute(url, "'", "''", 'g')
-    var iwr_args = "-UseBasicParsing -Uri '" .. esc_url .. "' -Method " .. method .. " -Headers $headers"
+  for header in headers
+    var esc_header = substitute(header, '"', '\"', 'g')
+    curl_cmd ..= '-H "' .. esc_header .. '" '
+  endfor
 
-    if !empty(json_body)
-      var ps_body = substitute(json_body, "'", "''", 'g')
-      ps_cmd ..= "$body = '" .. ps_body .. "';"
-      iwr_args ..= " -Body $body -ContentType 'application/json'"
-    endif
+  if !empty(json_body)
+    var esc_body = substitute(json_body, "'", "'\\''", 'g')
+    curl_cmd ..= "-d '" .. esc_body .. "' "
+  endif
 
-    ps_cmd ..= "Invoke-WebRequest " .. iwr_args .. " | Select-Object -ExpandProperty Content"
-    ps_cmd ..= '"'
+  curl_cmd ..= "'" .. esc_url .. "'"
 
-    response = system(ps_cmd)
-    if v:shell_error != 0
-      echom 'PowerShell Error: ' .. v:shell_error
-      return ''
-    endif
-  else
-    var esc_url = substitute(url, "'", "'\\''", 'g')
-    var curl_cmd = 'curl -s -X ' .. method .. ' --compressed '
-
-    for header in headers
-      var esc_header = substitute(header, '"', '\"', 'g')
-      curl_cmd ..= '-H "' .. esc_header .. '" '
-    endfor
-
-    if !empty(json_body)
-      var esc_body = substitute(json_body, "'", "'\\''", 'g')
-      curl_cmd ..= "-d '" .. esc_body .. "' "
-    endif
-
-    curl_cmd ..= "'" .. esc_url .. "'"
-
-    response = system(curl_cmd)
-    if v:shell_error != 0
-      echom 'Curl Error: ' .. v:shell_error
-      return ''
-    endif
+  response = system(curl_cmd)
+  if v:shell_error != 0
+    return ''
   endif
 
   return response
