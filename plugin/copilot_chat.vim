@@ -39,7 +39,7 @@ command! -nargs=0 CopilotChatReset copilot.ResetChat()
 command! -nargs=? CopilotChatSetActive _buffer.SetActive(<q-args>)
 command! -nargs=0 CopilotChatToggle _buffer.ToggleActiveChat()
 command! -nargs=0 CopilotChatSwitchMode _buffer.SwitchMode()
-command! -nargs=0 CopilotChatLogin auth.NewLogin()
+command! -nargs=0 CopilotChatLogin auth.VerifySignin()
 
 vnoremap <silent> <Plug>CopilotChatAddSelection :<C-u>call copilot_chat#buffer#AddSelection()<CR>
 
