@@ -49,6 +49,10 @@ def GetChatToken(fetch_new: bool): any
   endif
 enddef
 
+export def NewLogin(): void
+  GetChatToken(true)
+enddef
+
 export def GetBearerToken(): string
   if exists('g:copilot_chat_test_mode')
     return ''
