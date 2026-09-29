@@ -430,6 +430,15 @@ export def CheckForMacro(): void
         add(buff_list, $'#file: {filename}')
       endif
     endfor
+
+    if len(buff_list) > 0
+      var buff_text: string = join(buff_list, "\n") .. "\n"
+      exec 'normal! i' .. buff_text
+    else
+      exec "normal! iNo buffers found\n"
+    endif
+
+    cursor(line('.'), 1)
   elseif current_line =~# '#file: '
     if completion_active == 1 && !pumvisible()
       completion_active = 0
