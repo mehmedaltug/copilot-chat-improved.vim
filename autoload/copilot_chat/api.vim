@@ -268,7 +268,6 @@ def HandleJobClose(j: job, exit_status: number): void
   var result = ''
   for line in curl_output
     if line =~? '^data: {'
-      # Handle SSE streams gracefully (skip 'data: [DONE]')
       var payload = strcharpart(line, 6)
       if payload ==# '[DONE]'
         continue
@@ -291,10 +290,7 @@ def HandleJobClose(j: job, exit_status: number): void
   var width = winwidth(0) - 2 - getwininfo(win_getid())[0].textoff
   var response_start = line('$') + 1
 
-  # Iterate line-by-line to pass string items instead of list<string>
-  for resp_line in response
-    _buffer.AppendResponse(resp_line)
-  endfor
+  _buffer.AppendResponse(result)
 
   var wrap_width = width + 2
   var softwrap_lines = 0

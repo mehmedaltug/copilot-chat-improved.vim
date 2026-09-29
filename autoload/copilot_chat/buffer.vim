@@ -199,7 +199,10 @@ export def AppendResponse(message: string): void
   separator ..= repeat('━', width)
 
   AppendMessage(separator)
-  AppendMessage(message)
+  var lines = split(message, "\n", true)
+  for line in lines
+    AppendMessage(line)
+  endfor
   AddInputSeparator()
 enddef
 
