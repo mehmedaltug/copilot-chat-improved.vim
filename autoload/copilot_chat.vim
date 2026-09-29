@@ -51,6 +51,34 @@ export def ResetChat(): void
   endif
 enddef
 
+def GetAllFiles(): list<string>
+  var files: list<string> = []
+
+  if executable('git')
+    var git_files = systemlist('git ls-files --cached --others --exclude-standard')
+    if v:shell_error == 0 && !empty(git_files)
+      return git_files
+    endif
+  endif
+
+  var ignore_dirs = [
+    'node_modules', '__pycache__', '__cache__', 'target', 'bin', 'out',
+    '\.git', '\.svn', '\.hg', 'dist', 'build', '\.venv', 'venv', '\.idea', '\.vscode'
+  ]
+  var ignore_regex = '\(^\|/\)\(' .. join(ignore_dirs, '\|') .. '\)\(/\|$\)'
+
+  for path in globpath('.', '**', 0, 1)
+    if isdirectory(path)
+      continue
+    endif
+    var norm_path = tr(substitute(path, '^\./', '', ''), '\', '/')
+    if norm_path !~? ignore_regex
+      add(files, norm_path)
+    endif
+  endfor
+  return files
+enddef
+
 export def SubmitMessage(): void
   var messages = []
   var pattern = ' ━\+$'
@@ -88,6 +116,8 @@ export def SubmitMessage(): void
       elseif line =~? '^#file: '
         var filename: string = matchstr(line, '^#file: \s*\zs.*\ze$')
         add(file_list, filename)
+      elseif line =~? '^#allfiles'
+        extend(file_list, GetAllFiles())
       endif
     endfor
     var message: string = join(lines, "\n")
