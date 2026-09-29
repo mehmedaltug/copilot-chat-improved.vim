@@ -107,7 +107,7 @@ export def FetchModels(chat_token: string): list<string>
   return model_list
 enddef
 
-export def AgentRequest(messages: list<any>): void
+export def AgentRequest(messages: list<any>): job
   var chat_token: string = auth.VerifySignin()
   curl_output = []
   buffer_messages = messages
@@ -144,6 +144,8 @@ export def AgentRequest(messages: list<any>): void
      'err_cb': HandleAgentJobError
   })
   _buffer.WaitingForResponse()
+
+  return job
 enddef
 
 export def AsyncRequest(messages: list<any>, file_list: list<any>): job
