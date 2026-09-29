@@ -223,6 +223,16 @@ export def SwitchMode(): void
   setbufline(g:copilot_chat_active_buffer, 1, $'[{g:copilot_chat_mode}] Welcome to Copilot Chat! Type your message below:')
 enddef
 
+export def ChangeMode(mode: string): void
+  g:copilot_chat_mode == mode
+
+  if g:copilot_chat_active_buffer == -1 || !bufexists(g:copilot_chat_active_buffer)
+    return
+  endif
+
+  setbufline(g:copilot_chat_active_buffer, 1, $'[{g:copilot_chat_mode}] Welcome to Copilot Chat! Type your message below:')
+enddef
+
 export def SetActive(buf: any): void
   var safe_buf = str2nr(buf)
   if safe_buf == 0
@@ -446,5 +456,7 @@ export def CheckForMacro(): void
       complete(start + 1, matches)
       completion_active = 1
     endif
+  elseif current_line =~# '/agent'
+    ChangeMode('agent')
   endif
 enddef
