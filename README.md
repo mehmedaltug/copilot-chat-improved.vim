@@ -35,7 +35,7 @@ filetype plugin indent on
 Clone repository:
 
 ```bash
-git clone [https://github.com/mehmedaltug/copilot-chat-improved.vim.git](https://github.com/mehmedaltug/copilot-chat-improved.vim.git) ~/.vim/bundle
+git clone https://github.com/mehmedaltug/copilot-chat-improved.vim.git ~/.vim/bundle
 
 ```
 
