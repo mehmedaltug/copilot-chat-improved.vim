@@ -252,7 +252,7 @@ export def Http(method: string, url: string, headers: list<any>, body: any): str
       endfor
       ps_cmd ..= '};'
     endif
-    ps_cmd ..= "Invoke-WebRequest -Uri '" .. url .. "' -Method " .. method .. " -Headers $headers -Body $body -ContentType 'application/json' | Select-Object -ExpandProperty Content"
+    ps_cmd ..= "Invoke-WebRequest -UseBasicParsing -Uri '" .. url .. "' -Method " .. method .. " -Headers $headers -Body $body -ContentType 'application/json' | Select-Object -ExpandProperty Content"
     ps_cmd ..= '"'
     response = system(ps_cmd)
   else
