@@ -120,6 +120,7 @@ Copilot can now act as an autonomous workspace agent!
 * [x] **`/buff all` Macro**: Inject all currently open buffers into context automatically.
 * [ ] **Copilot Instructions Support**: Automatic loading of custom repository guidelines from `.github/copilot-instructions.md`.
 * [ ] **Model Selection Fixes**: Resolving model selection popup bugs in `:CopilotChatModels`.
+* [ ] **Consent prompt for file patches**: Allow the user to review the diff before allowing the agent to change files.
 
 ---
 
