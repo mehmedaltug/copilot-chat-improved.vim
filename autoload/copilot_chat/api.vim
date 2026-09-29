@@ -118,8 +118,8 @@ export def AgentRequest(messages: list<any>): void
     'tools': tools.List(),
     'input': messages
   })
-  debugger.Write('making agent request')
-  debugger.Write(data)
+  #debugger.Write('making agent request')
+  #debugger.Write(data)
 
   current_tmpfile = tempname()
   writefile([data], current_tmpfile)
