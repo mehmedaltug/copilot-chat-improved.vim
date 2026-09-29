@@ -136,6 +136,7 @@ Copilot can now act as an autonomous workspace agent!
 | `:CopilotChatLoad <name>?` | Load chat history |
 | `:CopilotChatList` | List all saved chat histories |
 | `:CopilotChatSetActive <bufnr>?` | Sets active chat window to specified buffer number |
+| `:CopilotChatLogin` | Login to github (if process doesnt auto open) |
 
 ## Plugin Keys
 
@@ -170,12 +171,12 @@ let g:copilot_chat_file_cache_timeout = 5
 
 ## Credits & Attributions
 
-This project is a fork of [DanBradbury/copilot-chat.vim](https://www.google.com/url?sa=E&source=gmail&q=https://github.com/DanBradbury/copilot-chat.vim).
+This project is a fork of [DanBradbury/copilot-chat.vim](https://github.com/DanBradbury/copilot-chat.vim).
 
 | Contribution / Component | Original Author | Modifications / Enhancements in this Fork |
 | --- | --- | --- |
-| **Core Plugin Architecture** | [DanBradbury](https://www.google.com/search?q=https://github.com/DanBradbury) | Adapted, bug-fixed, and expanded for agent workflows. |
+| **Core Plugin Architecture** | [DanBradbury](https://github.com/DanBradbury) | Adapted, bug-fixed, and expanded for agent workflows. |
 | **Agent Mode (Base Concept)** | Dan Bradbury (experimental branch) | Used as initial proof-of-concept for tool calling. |
-| **Agent Mode (Refactor & Enhancements)** | [mehmedaltug](https://www.google.com/search?q=https://github.com/mehmedaltug) | **Heavily modified & rewritten**: Added Windows path normalization (`NormalizePath`), silent tool execution, directory listing (`list_dir`), safe JSON parameter decoding, and robust diff patching. |
-| **Context Macros (`#allfiles`, `@agent`, `@ask`)** | [mehmedaltug](https://www.google.com/search?q=https://github.com/mehmedaltug) | New context handlers and macro integrations. |
-| **Buffer Clutter & Curl Warning Removal** | [mehmedaltug](https://www.google.com/search?q=https://github.com/mehmedaltug) | Cleaned up streaming close handling and tool execution output logs. |
+| **Agent Mode (Refactor & Enhancements)** | [mehmedaltug](https://github.com/mehmedaltug) | **Heavily modified & rewritten**: Added Windows path normalization (`NormalizePath`), silent tool execution, directory listing (`list_dir`), safe JSON parameter decoding, and robust diff patching. |
+| **Context Macros (`#allfiles`, `@agent`, `@ask`)** | [mehmedaltug](https://github.com/mehmedaltug) | New context handlers and macro integrations. |
+| **Buffer Clutter & Curl Warning Removal** | [mehmedaltug](https://github.com/mehmedaltug) | Cleaned up streaming close handling and tool execution output logs. |
