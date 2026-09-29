@@ -107,9 +107,10 @@ Copilot can now act as an autonomous workspace agent!
 
 ### Autocomplete Macros & Context Tools
 
-* **`#allfiles`**: Automatically injects context from all relevant project files into your prompt.
+* **`#allfiles`**: Automatically injects context from all relevant project files into your prompt. auto excludes build, cache and framework library directories.
 * **`#file:` Macro**: Autocompletes file paths based on Git-tracked files or current working directory contents.
 * **`/tab all` Macro**: Expands into a list of all open tabs prefixed by `#file:` for easy multi-file reference.
+* **`/buff all` Macro**: Expands into a list of all open buffers prefixed by `#file:` for easy multi-file reference.
 
 ---
 
