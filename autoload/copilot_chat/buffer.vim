@@ -425,7 +425,7 @@ export def CheckForMacro(): void
 
     var buff_list: list<string> = []
     for buf in getbufinfo({'buflisted': 1})
-      var filename: string = bufname(buf)
+      var filename: string = buf.name
       if filename !=# '' && filename !~# 'CopilotChat'
         add(buff_list, $'#file: {filename}')
       endif
