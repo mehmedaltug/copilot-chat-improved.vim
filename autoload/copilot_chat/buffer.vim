@@ -199,7 +199,10 @@ export def AppendResponse(message: string): void
   separator ..= repeat('━', width)
 
   AppendMessage(separator)
-  AppendMessage(message)
+  var lines = split(message, "\n", true)
+  for line in lines
+    AppendMessage(line)
+  endfor
   AddInputSeparator()
 enddef
 
@@ -215,6 +218,16 @@ export def SwitchMode(): void
   else
     g:copilot_chat_mode = 'Ask'
   endif
+
+  if g:copilot_chat_active_buffer == -1 || !bufexists(g:copilot_chat_active_buffer)
+    return
+  endif
+
+  setbufline(g:copilot_chat_active_buffer, 1, $'[{g:copilot_chat_mode}] Welcome to Copilot Chat! Type your message below:')
+enddef
+
+export def ChangeMode(mode: string): void
+  g:copilot_chat_mode = mode
 
   if g:copilot_chat_active_buffer == -1 || !bufexists(g:copilot_chat_active_buffer)
     return
@@ -446,5 +459,9 @@ export def CheckForMacro(): void
       complete(start + 1, matches)
       completion_active = 1
     endif
+  elseif current_line =~# '@agent'
+    ChangeMode('Agent')
+  elseif current_line =~# '@ask'
+    ChangeMode('Ask')
   endif
 enddef
