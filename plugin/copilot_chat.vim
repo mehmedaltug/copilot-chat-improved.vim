@@ -2,6 +2,7 @@ vim9script
 scriptencoding utf-8
 
 import autoload 'copilot_chat.vim' as copilot
+import autoload 'copilot_chat/auth.vim' as auth
 import autoload 'copilot_chat/api.vim' as api
 import autoload 'copilot_chat/buffer.vim' as _buffer
 import autoload 'copilot_chat/config.vim' as config
@@ -38,6 +39,7 @@ command! -nargs=0 CopilotChatReset copilot.ResetChat()
 command! -nargs=? CopilotChatSetActive _buffer.SetActive(<q-args>)
 command! -nargs=0 CopilotChatToggle _buffer.ToggleActiveChat()
 command! -nargs=0 CopilotChatSwitchMode _buffer.SwitchMode()
+command! -nargs=0 CopilotChatLogin auth.NewLogin()
 
 vnoremap <silent> <Plug>CopilotChatAddSelection :<C-u>call copilot_chat#buffer#AddSelection()<CR>
 
