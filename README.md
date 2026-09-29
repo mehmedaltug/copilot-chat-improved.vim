@@ -116,7 +116,7 @@ Copilot can now act as an autonomous workspace agent!
 ### Roadmap & In Progress 🛠️
 
 * [x] **Agent mode**: Make copilot use tools and work like an agent.
-* [ ] **`/buff all` Macro**: Inject all currently open buffers into context automatically.
+* [x] **`/buff all` Macro**: Inject all currently open buffers into context automatically.
 * [ ] **Copilot Instructions Support**: Automatic loading of custom repository guidelines from `.github/copilot-instructions.md`.
 * [ ] **Chat History Fixes**: Fixes for `:CopilotChatLoad` stability.
 * [ ] **Model Selection Fixes**: Resolving model selection popup bugs in `:CopilotChatModels`.
@@ -181,3 +181,4 @@ This project is a fork of [DanBradbury/copilot-chat.vim](https://github.com/DanB
 | **Agent Mode (Refactor & Enhancements)** | [mehmedaltug](https://github.com/mehmedaltug) | **Heavily modified & rewritten**: Added Windows path normalization (`NormalizePath`), silent tool execution, directory listing (`list_dir`), safe JSON parameter decoding, and robust diff patching. |
 | **Context Macros (`#allfiles`, `@agent`, `@ask`)** | [mehmedaltug](https://github.com/mehmedaltug) | New context handlers and macro integrations. |
 | **Buffer Clutter & Curl Warning Removal** | [mehmedaltug](https://github.com/mehmedaltug) | Cleaned up streaming close handling and tool execution output logs. |
+| **`/buff all` macro** | [mehmedaltug](https://github.com/mehmedaltug) & [Martin Askestad](https://github.com/MartinAskestad) (Same implementation) | Macro for including all active buffers as #file in chat |
