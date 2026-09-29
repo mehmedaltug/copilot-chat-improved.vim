@@ -88,7 +88,7 @@ filetype plugin indent on
 
 ## What's New & Key Features
 
-### 🤖 Agent Mode (`@agent` & `@ask`)
+### Agent Mode (`@agent` & `@ask`)
 
 Copilot can now act as an autonomous workspace agent!
 
@@ -113,12 +113,11 @@ Copilot can now act as an autonomous workspace agent!
 
 ---
 
-### Roadmap & In Progress 🛠️
+### Roadmap & In Progress
 
 * [x] **Agent mode**: Make copilot use tools and work like an agent.
 * [x] **`/buff all` Macro**: Inject all currently open buffers into context automatically.
 * [ ] **Copilot Instructions Support**: Automatic loading of custom repository guidelines from `.github/copilot-instructions.md`.
-* [ ] **Chat History Fixes**: Fixes for `:CopilotChatLoad` stability.
 * [ ] **Model Selection Fixes**: Resolving model selection popup bugs in `:CopilotChatModels`.
 
 ---
