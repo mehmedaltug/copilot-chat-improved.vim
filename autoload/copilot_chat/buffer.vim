@@ -457,6 +457,8 @@ export def CheckForMacro(): void
       completion_active = 1
     endif
   elseif current_line =~# '/agent'
-    ChangeMode('agent')
+    ChangeMode('Agent')
+  elseif current_line =~# '/ask'
+    ChangeMode('Ask')
   endif
 enddef
