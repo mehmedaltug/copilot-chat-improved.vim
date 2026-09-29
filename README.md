@@ -115,6 +115,7 @@ Copilot can now act as an autonomous workspace agent!
 
 ### Roadmap & In Progress 🛠️
 
+* [x] **Agent mode**: Make copilot use tools and work like an agent.
 * [ ] **`/buff all` Macro**: Inject all currently open buffers into context automatically.
 * [ ] **Copilot Instructions Support**: Automatic loading of custom repository guidelines from `.github/copilot-instructions.md`.
 * [ ] **Chat History Fixes**: Fixes for `:CopilotChatLoad` stability.
