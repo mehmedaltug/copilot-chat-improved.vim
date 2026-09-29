@@ -17,7 +17,7 @@ export def Http(method: string, url: string, headers: list<string>, body: any): 
   var json_body = (method !=# 'GET' && !empty(body)) ? json_encode(body) : ''
 
   if has('win32')
-    var ps_cmd = 'powershell -NoProfile -Command "'
+    var ps_cmd = 'powershell -WindowStyle Hidden -NoProfile -Command "'
     ps_cmd ..= '$headers = @{'
     for header in headers
       var idx = stridx(header, ':')
