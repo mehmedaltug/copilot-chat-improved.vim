@@ -81,7 +81,7 @@ filetype plugin indent on
 ## Setup
 
 1. Login if not already logged in by using `:CopilotChatLogin`.
-2. Run `:CopilotChatOpen` to open a chat window. You will be prompted to setup your device on first use.
+2. Run `:CopilotChatOpen` to open a chat window.
 3. Write your prompt under the line separator and press `<Enter>` in normal mode.
 4. You should see a `Waiting for response..` indicator in the buffer while Copilot is working in the background.
 
