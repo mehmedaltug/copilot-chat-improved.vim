@@ -111,30 +111,40 @@ export def AgentRequest(messages: list<any>): job
   var chat_token: string = auth.VerifySignin()
   curl_output = []
   buffer_messages = messages
-  var url: string = 'https://api.individual.githubcopilot.com/responses'
-  var data: string = json_encode({
+  var url: string = 'https://api.githubcopilot.com/chat/completions'
+
+  var full_messages = copy(messages)
+  if empty(full_messages) || get(full_messages[0], 'role', '') != 'system'
+    insert(full_messages, {
+      'role': 'system',
+      'content': $'You are an agent assisting with the codebase in: {getcwd()}. Use tools to explore files before answering.'
+    }, 0)
+  endif
+
+  var payload: dict<any> = {
     'model': models.Current(),
     'stream': true,
-    'tools': tools.List(),
-    'input': messages
-  })
-  #debugger.Write('making agent request')
-  #debugger.Write(data)
+    'temperature': 0,
+    'messages': full_messages
+  }
 
+  var tool_list = tools.List()
+  if !empty(tool_list)
+    payload['tools'] = tool_list
+  endif
+
+  var data: string = json_encode(payload)
   current_tmpfile = tempname()
   writefile([data], current_tmpfile)
 
   var curl_cmd: list<string> = [
-    'curl',
-    '-s',
-    '-X',
-    'POST',
-    '-H',
-    'Content-Type: application/json',
+    'curl', '-s', '-N',
+    '-X', 'POST',
+    '-H', 'Content-Type: application/json',
     '-H', 'Authorization: Bearer ' .. chat_token,
     '-H', 'Editor-Version: vscode/1.80.1',
-    '-d',
-    $'@{current_tmpfile}',
+    '-H', 'Copilot-Integration-Id: vscode-chat',
+    '-d', $'@{current_tmpfile}',
     url
   ]
 
@@ -203,14 +213,10 @@ enddef
 def HandleAgentJobOutput(channel: channel, msg: any): void
   if type(msg) == v:t_list
     for data in msg
-      if data =~? '^data: {'
-        add(curl_output, data)
-      endif
+      add(curl_output, data)
     endfor
   else
-    if msg =~? '^data: {'
-      add(curl_output, msg)
-    endif
+    add(curl_output, msg)
   endif
 enddef
 
@@ -220,27 +226,81 @@ def HandleAgentJobClose(j: job, exit_status: number): void
   endif
 
   deletebufline(g:copilot_chat_active_buffer, '$')
-  for line in curl_output
-    if line =~? '^data: {'
+
+  var full_text = ''
+  var error_lines = []
+  var pending_tool_calls: dict<dict<string>> = {}
+
+  for raw_line in curl_output
+    var line = substitute(raw_line, '[\r\n]', '', 'g')
+    if empty(line)
+      continue
+    endif
+
+    if line =~? '^data:\s*'
+      var payload = substitute(line, '^data:\s*', '', '')
+      if payload ==# '[DONE]'
+        continue
+      endif
+
       try
-        var json_completion = json_decode(strcharpart(line, 6))
-        if has_key(json_completion, 'response') && json_completion['response']['output'] != v:null
-          if len(json_completion['response']['output']) > 0
-            var outcome = json_completion['response']['output'][-1]
-            if outcome['type'] == 'function_call' && index(function_calls, outcome['call_id']) == -1
-              tools.InvokeTool(outcome, buffer_messages)
-              add(function_calls, outcome['call_id'])
-            elseif outcome['type'] == 'message'
-              for m in outcome['content']
-                _buffer.AppendResponse(m['text'])
+        var json_completion = json_decode(payload)
+
+        if has_key(json_completion, 'choices') && !empty(json_completion.choices)
+          var choice = json_completion.choices[0]
+          if has_key(choice, 'delta')
+            var delta = choice.delta
+
+            if has_key(delta, 'content') && type(delta.content) == v:t_string
+              full_text ..= delta.content
+            endif
+
+            if has_key(delta, 'tool_calls') && type(delta.tool_calls) == v:t_list
+              for tc in delta.tool_calls
+                var idx = string(get(tc, 'index', 0))
+                if !has_key(pending_tool_calls, idx)
+                  pending_tool_calls[idx] = {'id': '', 'name': '', 'arguments': ''}
+                endif
+
+                if has_key(tc, 'id') && !empty(tc.id)
+                  pending_tool_calls[idx]['id'] = tc.id
+                endif
+
+                if has_key(tc, 'function')
+                  var fn = tc.function
+                  if has_key(fn, 'name') && !empty(fn.name)
+                    pending_tool_calls[idx]['name'] = fn.name
+                  endif
+                  if has_key(fn, 'arguments') && !empty(fn.arguments)
+                    pending_tool_calls[idx]['arguments'] ..= fn.arguments
+                  endif
+                endif
               endfor
             endif
           endif
         endif
       catch
       endtry
+    elseif line =~? 'error' || line =~? '^{\s*"message"'
+      add(error_lines, line)
     endif
   endfor
+
+  if !empty(pending_tool_calls)
+    for [idx, tc] in items(pending_tool_calls)
+      if !empty(tc.id) && index(function_calls, tc.id) == -1
+        add(function_calls, tc.id)
+        tools.InvokeTool(tc, buffer_messages)
+      endif
+    endfor
+    return
+  endif
+
+  if !empty(full_text)
+    _buffer.AppendResponse(full_text)
+  elseif !empty(error_lines)
+    _buffer.AppendResponse("API Error:\n" .. join(error_lines, "\n"))
+  endif
 enddef
 
 def HandleAgentJobError(channel: channel, msg: any): void
