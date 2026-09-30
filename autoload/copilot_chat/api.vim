@@ -13,17 +13,15 @@ var function_calls: list<string> = []
 var current_tmpfile: string = ''
 
 def GetSystemPrompt(): string
-  # assume dir containing .git, fallback to cwd
-  var project_root: string = finddir('.git', ';')
+  # assume dir containing .github, fallback to cwd
+  var project_root: string = finddir('.github', ';')
   if project_root == ''
-    project_root = getcwd()
-  else
-    project_root = fnamemodify(project_root, ':h')
+    project_root = getcwd() .. '/.github'
   endif
 
-  var instructions: string = project_root + '/.github/copilot-instructions.md'
+  var instructions: string = project_root + '/copilot-instructions.md'
   
-  # try to read .github/instructions.md, fallback to basic prompt
+  # try to read .github/copilot-instructions.md, fallback to basic prompt
   if filereadable(instructions)
     var lines: list<string> = readfile(instructions)
     instructions = join(lines, '\n')
