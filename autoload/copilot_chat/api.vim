@@ -12,6 +12,31 @@ var buffer_messages: list<any> = []
 var function_calls: list<string> = []
 var current_tmpfile: string = ''
 
+def GetSystemPrompt(): string
+  # assume dir containing .git, fallback to cwd
+  var project_root: string = finddir('.git', ';')
+  if project_root == ''
+    project_root = getcwd()
+  else
+    project_root = fnamemodify(project_root, ':h')
+  endif
+
+  var instructions: string = project_root + '/.github/copilot-instructions.md'
+  
+  # try to read .github/instructions.md, fallback to basic prompt
+  if filereadable(instructions)
+    var lines: list<string> = readfile(instructions)
+    instructions = join(lines, '\n')
+  else
+    instructions = $'You are an assistive AI working for this codebase in: {getcwd()}.'
+    if g:copilot_chat_mode = 'Agent'
+      instructions ..= ' Use the tools to explore the project first.'
+    endif
+  endif
+  
+  return instructions
+enddef
+
 export def Http(method: string, url: string, headers: list<string>, body: any): string
   var response = ''
   var json_body = (method !=# 'GET' && !empty(body)) ? json_encode(body) : ''
@@ -78,19 +103,11 @@ export def AgentRequest(messages: list<any>): job
   buffer_messages = messages
   var url: string = 'https://api.githubcopilot.com/chat/completions'
 
-  var full_messages = copy(messages)
-  if empty(full_messages) || get(full_messages[0], 'role', '') != 'system'
-    insert(full_messages, {
-      'role': 'system',
-      'content': $'You are an agent assisting with the codebase in: {getcwd()}. Use tools to explore files before answering.'
-    }, 0)
-  endif
-
   var payload: dict<any> = {
     'model': models.Current(),
     'stream': true,
     'temperature': 0,
-    'messages': full_messages
+    'messages': [{'role': 'system', 'content': GetSystemPrompt()}] + messages
   }
 
   var tool_list = tools.List()
@@ -144,7 +161,7 @@ export def AsyncRequest(messages: list<any>, file_list: list<any>): job
     'top_p': 1,
     'n': 1,
     'stream': true,
-    'messages': messages
+    'messages': [{'role': 'system', 'content': GetSystemPrompt()}] + messages
   })
 
   current_tmpfile = tempname()
