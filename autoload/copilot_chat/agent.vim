@@ -190,8 +190,6 @@ export def ReadFile(outcome: dict<any>): string
   endtry
 enddef
 
-vim9script
-
 def ShowDiffAndConfirm(path: string, new_lines: list<string>): number
   var tmp_old = tempname()
   var tmp_new = tempname()
