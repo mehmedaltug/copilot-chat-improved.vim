@@ -6,7 +6,8 @@ An enhanced fork of [DanBradbury/copilot-chat.vim](https://github.com/DanBradbur
 
 Nvim users can check [CopilotChat.nvim](https://github.com/CopilotC-Nvim/CopilotChat.nvim) for a Neovim-native experience.
 
-![copilotChat](https://github.com/user-attachments/assets/0cd1119d-89c8-4633-972e-641718e6b24b)
+<img width="1920" height="1026" alt="{446A8615-807F-4EB9-8CDB-568DC337E017}" src="https://github.com/user-attachments/assets/b7fef9c7-6946-4902-b9b2-e79b5a804206" />
+
 </div>
 
 ## Requirements
@@ -121,7 +122,7 @@ Copilot can now act as an autonomous workspace agent!
 * [x] **`/buff all` Macro**: Inject all currently open buffers into context automatically.
 * [ ] **Copilot Instructions Support**: Automatic loading of custom repository guidelines from `.github/copilot-instructions.md`.
 * [ ] **Model Selection Fixes**: Resolving model selection popup bugs in `:CopilotChatModels`.
-* [x] **Consent prompt for file patches**: Allow the user to review the diff before allowing the agent to change files.
+* [x] **Consent for file patches & path fixes**: Allow the user to review the diff before allowing the agent to change files and fix the shortcomings of the tool.
 
 ---
 
