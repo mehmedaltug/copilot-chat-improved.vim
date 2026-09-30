@@ -39,6 +39,7 @@ export def ResetChat(): void
   endif
 
   var current_buf = bufnr('%')
+  g:copilot_patch_autoapprove = false
 
   # Switch to the active chat buffer if not already there
   if current_buf != g:copilot_chat_active_buffer

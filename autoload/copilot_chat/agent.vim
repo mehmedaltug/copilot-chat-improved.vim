@@ -190,6 +190,162 @@ export def ReadFile(outcome: dict<any>): string
   endtry
 enddef
 
+def ShowDiffAndConfirm(path: string, new_lines: list<string>): number
+  var tmp_old = tempname()
+  var tmp_new = tempname()
+
+  if filereadable(path)
+    writefile(readfile(path), tmp_old, 'b')
+  else
+    writefile([], tmp_old, 'b')
+  endif
+
+  writefile(new_lines, tmp_new, 'b')
+
+  # Open temp files in a diff view tab
+  execute 'tabnew ' .. fnameescape(tmp_old)
+  execute 'vert diffsplit ' .. fnameescape(tmp_new)
+
+  setlocal buftype=nofile bufhidden=wipe noswapfile nomodifiable
+  wincmd l
+  setlocal buftype=nofile bufhidden=wipe noswapfile nomodifiable
+  wincmd p
+  redraw!
+
+  # Prompt user for consent (1=Yes, 2=No, 3=Allow for session, 4=Abort)
+  var choice = confirm($'Apply patch to {path}?', "&Yes\n&No\n&Allow for session\n&Abort", 1)
+
+  execute 'tabclose!'
+
+  # Cleanup
+  if filereadable(tmp_old) | delete(tmp_old) | endif
+  if filereadable(tmp_new) | delete(tmp_new) | endif
+
+  return choice
+enddef
+
+def PromptConsent(path: string, new_lines: list<string>): dict<any>
+  if get(g:, 'copilot_patch_autoapprove', false)
+    return {'apply': true, 'abort': false}
+  endif
+
+  var choice = ShowDiffAndConfirm(path, new_lines)
+
+  if choice == 3
+    g:copilot_patch_autoapprove = true
+    return {'apply': true, 'abort': false}
+  elseif choice == 1 # Yes
+    return {'apply': true, 'abort': false}
+  elseif choice == 4 || choice == 0 # Abort or ESC
+    return {'apply': false, 'abort': true}
+  else
+    return {'apply': false, 'abort': false}
+  endif
+enddef
+
+def ApplyHunksToFile(orig_lines: list<string>, section: list<string>): list<string>
+  var result = copy(orig_lines)
+
+  # Check if patch is full file replacement
+  var has_context_or_minus = false
+  for line in section
+    if strlen(line) > 0 && (line[0] == ' ' || line[0] == '-')
+      has_context_or_minus = true
+      break
+    endif
+  endfor
+
+  # If there are no context or '-' lines, treat as file overwrite
+  if !has_context_or_minus
+    var new_file = []
+    for line in section
+      if strlen(line) > 0 && line[0] == '+'
+        add(new_file, line[1 : ])
+      elseif strlen(line) > 0 && line[0] != '+' && line !~# '^\*\*\*' && line !~# '^@@'
+        add(new_file, line)
+      endif
+    endfor
+    return new_file
+  endif
+
+  # Parse patch section into hunks and apply them against existing file
+  var i = 0
+  var n = len(section)
+
+  while i < n
+    if section[i] =~# '^@@' || section[i] =~# '^\*\*\*' || empty(section[i])
+      i += 1
+      continue
+    endif
+
+    var old_chunk = []
+    var new_chunk = []
+
+    while i < n && section[i] !~# '^@@' && section[i] !~# '^\*\*\*'
+      var line = section[i]
+      var prefix = strlen(line) > 0 ? line[0] : ''
+      var content = strlen(line) > 1 ? line[1 : ] : ''
+
+      if prefix == ' '
+        add(old_chunk, content)
+        add(new_chunk, content)
+      elseif prefix == '-'
+        add(old_chunk, content)
+      elseif prefix == '+'
+        add(new_chunk, content)
+      else
+        add(old_chunk, line)
+        add(new_chunk, line)
+      endif
+      i += 1
+    endwhile
+
+    if empty(old_chunk) && !empty(new_chunk)
+      extend(result, new_chunk)
+      continue
+    endif
+
+    # Match old_chunk context inside existing file lines
+    var match_idx = -1
+    var old_len = len(old_chunk)
+    var res_len = len(result)
+
+    for r in range(res_len - old_len + 1)
+      if result[r : r + old_len - 1] == old_chunk
+        match_idx = r
+        break
+      endif
+    endfor
+
+    # Fallback to trimmed line matching if whitespace slightly differs
+    if match_idx == -1
+      for r in range(res_len - old_len + 1)
+        var matches = true
+        for c in range(old_len)
+          if trim(result[r + c]) != trim(old_chunk[c])
+            matches = false
+            break
+          endif
+        endfor
+        if matches
+          match_idx = r
+          break
+        endif
+      endfor
+    endif
+
+    if match_idx != -1
+      var before = match_idx > 0 ? result[0 : match_idx - 1] : []
+      var after = (match_idx + old_len) < res_len ? result[match_idx + old_len : ] : []
+      result = before + new_chunk + after
+    else
+      echom $'ApplyPatch Warning: Could not match hunk context in file for: "{get(old_chunk, 0, "")}"'
+    endif
+  endwhile
+
+  return result
+enddef
+
 export def ApplyPatch(outcome: dict<any>): string
   var params = GetParams(outcome)
   var patch_text = get(params, 'input', '')
@@ -219,7 +375,6 @@ export def ApplyPatch(outcome: dict<any>): string
       if ln =~# '^\*\*\* Update File:'
         var raw_path = trim(substitute(ln, '^\*\*\* Update File:\s*', '', ''))
         var path = NormalizePath(raw_path)
-        add(updated_files, path)
         i += 1
 
         var section = []
@@ -233,21 +388,26 @@ export def ApplyPatch(outcome: dict<any>): string
           continue
         endif
 
-        var new_lines = []
-        for s in section
-          if strlen(s) > 0 && s[0] == '+'
-            add(new_lines, s[1 : ])
-          endif
-        endfor
+        var orig_lines = readfile(path)
+        var new_lines = ApplyHunksToFile(orig_lines, section)
 
         if len(new_lines) > 0
-          try
-            writefile(new_lines, path, 'b')
-          catch
-            echom $'Failed to write updated file: {path}'
-          endtry
-        else
-          echom $'Update for {path} contained no "+" lines; file left unchanged.'
+          var consent = PromptConsent(path, new_lines)
+          if consent.abort
+            echom 'Patch application aborted by user.'
+            break
+          endif
+
+          if consent.apply
+            try
+              writefile(new_lines, path, 'b')
+              add(updated_files, path)
+            catch
+              echom $'Failed to write updated file: {path}'
+            endtry
+          else
+            echom $'Skipped update for: {path}'
+          endif
         endif
 
         continue
@@ -264,12 +424,24 @@ export def ApplyPatch(outcome: dict<any>): string
           continue
         endif
 
-        try
-          delete(path)
-          echom $'Deleted: {path}'
-        catch
-          echom $'Failed to delete: {path}'
-        endtry
+        var consent = PromptConsent(path, [])
+        if consent.abort
+          echom 'Patch application aborted by user.'
+          break
+        endif
+
+        if consent.apply
+          try
+            delete(path)
+            add(updated_files, $'Deleted: {path}')
+            echom $'Deleted: {path}'
+          catch
+            echom $'Failed to delete: {path}'
+          endtry
+        else
+          echom $'Skipped deletion for: {path}'
+        endif
+
         continue
       endif
 
@@ -296,16 +468,28 @@ export def ApplyPatch(outcome: dict<any>): string
           i += 1
         endwhile
 
-        try
-          var parent = fnamemodify(path, ':h')
-          if !empty(parent) && !isdirectory(parent)
-            mkdir(parent, 'p')
-          endif
-          writefile(add_lines, path, 'b')
-          echom $'Added: {path}'
-        catch
-          echom $'Failed to add file: {path}'
-        endtry
+        var consent = PromptConsent(path, add_lines)
+        if consent.abort
+          echom 'Patch application aborted by user.'
+          break
+        endif
+
+        if consent.apply
+          try
+            var parent = fnamemodify(path, ':h')
+            if !empty(parent) && !isdirectory(parent)
+              mkdir(parent, 'p')
+            endif
+            writefile(add_lines, path, 'b')
+            add(updated_files, $'Added: {path}')
+            echom $'Added: {path}'
+          catch
+            echom $'Failed to add file: {path}'
+          endtry
+        else
+          echom $'Skipped adding file: {path}'
+        endif
+
         continue
       endif
 
