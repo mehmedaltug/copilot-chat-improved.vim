@@ -190,6 +190,61 @@ export def ReadFile(outcome: dict<any>): string
   endtry
 enddef
 
+vim9script
+
+def ShowDiffAndConfirm(path: string, new_lines: list<string>): number
+  var tmp_old = tempname()
+  var tmp_new = tempname()
+
+  if filereadable(path)
+    writefile(readfile(path), tmp_old, 'b')
+  else
+    writefile([], tmp_old, 'b')
+  endif
+
+  writefile(new_lines, tmp_new, 'b')
+
+  # Open temp files in a diff view tab
+  execute 'tabnew ' .. fnameescape(tmp_old)
+  execute 'vert diffsplit ' .. fnameescape(tmp_new)
+
+  setlocal buftype=nofile bufhidden=wipe noswapfile nomodifiable
+  wincmd l
+  setlocal buftype=nofile bufhidden=wipe noswapfile nomodifiable
+  wincmd p
+  redraw!
+
+  # Prompt user for consent (1=Yes, 2=No, 3=Allow for session, 4=Abort)
+  var choice = confirm($'Apply patch to {path}?', "&Yes\n&No\n&Allow for session\n&Abort", 1)
+
+  execute 'tabclose!'
+
+  # Cleanup
+  if filereadable(tmp_old) | delete(tmp_old) | endif
+  if filereadable(tmp_new) | delete(tmp_new) | endif
+
+  return choice
+enddef
+
+def PromptConsent(path: string, new_lines: list<string>): dict<any>
+  if get(g:, 'copilot_patch_autoapprove', false)
+    return {'apply': true, 'abort': false}
+  endif
+
+  var choice = ShowDiffAndConfirm(path, new_lines)
+
+  if choice == 3
+    g:copilot_patch_autoapprove = true
+    return {'apply': true, 'abort': false}
+  elseif choice == 1 # Yes
+    return {'apply': true, 'abort': false}
+  elseif choice == 4 || choice == 0 # Abort or ESC
+    return {'apply': false, 'abort': true}
+  else
+    return {'apply': false, 'abort': false}
+  endif
+enddef
+
 export def ApplyPatch(outcome: dict<any>): string
   var params = GetParams(outcome)
   var patch_text = get(params, 'input', '')
@@ -219,7 +274,6 @@ export def ApplyPatch(outcome: dict<any>): string
       if ln =~# '^\*\*\* Update File:'
         var raw_path = trim(substitute(ln, '^\*\*\* Update File:\s*', '', ''))
         var path = NormalizePath(raw_path)
-        add(updated_files, path)
         i += 1
 
         var section = []
@@ -241,11 +295,22 @@ export def ApplyPatch(outcome: dict<any>): string
         endfor
 
         if len(new_lines) > 0
-          try
-            writefile(new_lines, path, 'b')
-          catch
-            echom $'Failed to write updated file: {path}'
-          endtry
+          var consent = PromptConsent(path, new_lines)
+          if consent.abort
+            echom 'Patch application aborted by user.'
+            break
+          endif
+
+          if consent.apply
+            try
+              writefile(new_lines, path, 'b')
+              add(updated_files, path)
+            catch
+              echom $'Failed to write updated file: {path}'
+            endtry
+          else
+            echom $'Skipped update for: {path}'
+          endif
         else
           echom $'Update for {path} contained no "+" lines; file left unchanged.'
         endif
@@ -264,12 +329,24 @@ export def ApplyPatch(outcome: dict<any>): string
           continue
         endif
 
-        try
-          delete(path)
-          echom $'Deleted: {path}'
-        catch
-          echom $'Failed to delete: {path}'
-        endtry
+        var consent = PromptConsent(path, [])
+        if consent.abort
+          echom 'Patch application aborted by user.'
+          break
+        endif
+
+        if consent.apply
+          try
+            delete(path)
+            add(updated_files, $'Deleted: {path}')
+            echom $'Deleted: {path}'
+          catch
+            echom $'Failed to delete: {path}'
+          endtry
+        else
+          echom $'Skipped deletion for: {path}'
+        endif
+
         continue
       endif
 
@@ -296,16 +373,28 @@ export def ApplyPatch(outcome: dict<any>): string
           i += 1
         endwhile
 
-        try
-          var parent = fnamemodify(path, ':h')
-          if !empty(parent) && !isdirectory(parent)
-            mkdir(parent, 'p')
-          endif
-          writefile(add_lines, path, 'b')
-          echom $'Added: {path}'
-        catch
-          echom $'Failed to add file: {path}'
-        endtry
+        var consent = PromptConsent(path, add_lines)
+        if consent.abort
+          echom 'Patch application aborted by user.'
+          break
+        endif
+
+        if consent.apply
+          try
+            var parent = fnamemodify(path, ':h')
+            if !empty(parent) && !isdirectory(parent)
+              mkdir(parent, 'p')
+            endif
+            writefile(add_lines, path, 'b')
+            add(updated_files, $'Added: {path}')
+            echom $'Added: {path}'
+          catch
+            echom $'Failed to add file: {path}'
+          endtry
+        else
+          echom $'Skipped adding file: {path}'
+        endif
+
         continue
       endif
 
