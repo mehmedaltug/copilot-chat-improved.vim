@@ -19,7 +19,7 @@ def GetSystemPrompt(): string
     project_root = getcwd() .. '/.github'
   endif
 
-  var instructions: string = project_root + '/copilot-instructions.md'
+  var instructions: string = project_root .. '/copilot-instructions.md'
   
   # try to read .github/copilot-instructions.md, fallback to basic prompt
   if filereadable(instructions)
