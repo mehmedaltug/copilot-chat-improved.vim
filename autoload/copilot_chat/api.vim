@@ -27,7 +27,7 @@ def GetSystemPrompt(): string
     instructions = join(lines, '\n')
   else
     instructions = $'You are an assistive AI working for this codebase in: {getcwd()}.'
-    if g:copilot_chat_mode = 'Agent'
+    if g:copilot_chat_mode == 'Agent'
       instructions ..= ' Use the tools to explore the project first.'
     endif
   endif
